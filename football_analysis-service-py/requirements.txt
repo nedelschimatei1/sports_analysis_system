@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+boto3
+supervision
+opencv-python
+numpy
+scikit-learn
+scipy
+pillow
+pydantic
+ultralytics
+requests
+celery
+redis

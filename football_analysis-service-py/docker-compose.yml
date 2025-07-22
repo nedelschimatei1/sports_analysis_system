@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  football-ai-service:
+    build: .
+    container_name: football-ai-service
+    hostname: football-ai-service
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SPACES_ACCESS_KEY=${SPACES_ACCESS_KEY}
+      - SPACES_SECRET_KEY=${SPACES_SECRET_KEY}
+      - SPACES_BUCKET=${SPACES_BUCKET:-fanalysisbucket}
+      - SPACES_ENDPOINT=${SPACES_ENDPOINT:-https://fra1.digitaloceanspaces.com}
+      - SPACES_REGION=${SPACES_REGION:-FRA1}
+      - SMTP_USER=${SMTP_USER:-nedelschi.matei@gmail.com}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-jvcv mzot imaq oamc}
+      - PYTHONPATH=/app
+    volumes:
+      - ./models:/app/models
+      - ./temp:/app/temp:rw
+      - ./stubs:/app/stubs
+      - ai_processing_data:/app/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  celery-worker:
+    build: .
+    container_name: football-celery-worker
+    hostname: football-celery-worker
+    command: celery -A celery_config worker --loglevel=info --concurrency=2 --pool=prefork
+    environment:
+      - ENVIRONMENT=production
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SPACES_ACCESS_KEY=${SPACES_ACCESS_KEY}
+      - SPACES_SECRET_KEY=${SPACES_SECRET_KEY}
+      - SPACES_BUCKET=${SPACES_BUCKET:-fanalysisbucket}
+      - SPACES_ENDPOINT=${SPACES_ENDPOINT:-https://fra1.digitaloceanspaces.com}
+      - SPACES_REGION=${SPACES_REGION:-FRA1}
+      - PYTHONPATH=/app
+    volumes:
+      - ./models:/app/models
+      - ./temp:/app/temp:rw
+      - ./stubs:/app/stubs
+      - ai_processing_data:/app/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  redis:
+    image: redis:7-alpine
+    container_name: football-redis
+    hostname: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    networks:
+      - internal
+
+volumes:
+  redis_data:
+  ai_processing_data:
+
+networks:
+  internal: 
+    driver: bridge
